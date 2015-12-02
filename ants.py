@@ -1,4 +1,4 @@
-import pynet,netext
+from netpython import pynet,netext
 #from scipy.misc import imread
 import pylab
 import numpy as np
@@ -44,7 +44,7 @@ xlim_all=[283000,293000]
 ylim_all=[6650750,6656670]
 
 xlim_LA=[286000,286700]
-ylim_LA=[6651760,6652170]
+fvylim_LA=[6651760,6652170]
 
 xlim_MY=[289000,290000]
 ylim_MY=[6655380,6655970]
@@ -105,9 +105,16 @@ def load_relatedness_data(filename="MYLA_allSamples_Genotypes.txt",anttypes=["ew
 
                     if line[i]: # if data not missing:
 
-                        alleles=line[i].split('/')
+                        if not(line[3]=='malepupa'):
 
-                        allele_list.append((int(alleles[0]),int(alleles[1])))
+                            alleles=line[i].split('/')
+
+                            allele_list.append((int(alleles[0]),int(alleles[1])))
+
+                        else:
+
+                            allele=int(line[i])
+                            allele_list.append((allele,allele))
 
                     else:
 
@@ -116,12 +123,20 @@ def load_relatedness_data(filename="MYLA_allSamples_Genotypes.txt",anttypes=["ew
                 tempdict['alleles']=allele_list
 
                 antdict[ant]=tempdict
+
+            else:
+
+                print line[1]
+                print line[2]
+                print line[3]
+                print 'wot'
                 
         except:
 
             break
 
     return antdict
+
 
 def antnet(antdict,anttypes=['eworker','queen'],reftypes=['eworker','queen'],colonyavg=False,verbose=False):
 
@@ -343,6 +358,28 @@ def links(net,addone=True):
     else:
 
           return [(x[0],x[1],x[2]-1.0) for x in list(net.edges)]
+
+def joint_edges(net1,net2,addone=True):
+
+    r1=[]
+    r2=[]
+
+    if addone:
+
+        bias=1.0
+
+    else:
+
+        bias=0.0
+
+    for edge in list(net1.edges):
+
+        if (edge[0] in net2) and (edge[1] in net2):
+
+            r1.append(edge[2]-bias)
+            r2.append(net2[edge[0]][edge[1]]-bias)
+
+    return r1,r2
 
 
 # ==================== COMPUTING REFERENCE ENSEMBLE WITH ANTS SHUFFLED BETWEEN NESTS ================
@@ -1464,6 +1501,26 @@ def threshold_by_value(net,threshold,accept="<",keepIsolatedNodes=False):
     copyNodeProperties(net,newnet)
                 
     return newnet
+
+def subdict(antdict,prefix='MY',from_nest=1,to_nest=10):
+
+    allowed=[]
+
+    for i in range(from_nest,to_nest+1):
+
+        allowed.append(prefix+str(i))
+
+    newdict={}
+
+    for ant in antdict:
+
+        if antdict[ant]['site'] in allowed:
+
+            newdict[ant]=antdict[ant]
+
+    return newdict
+
+        
 
 
 
