@@ -1,7 +1,8 @@
 from netpython import pynet,netext
-#from scipy.misc import imread
+from scipy.misc import imread
 import pylab
 import numpy as np
+from scipy.stats import pearsonr
 
 from random import random
 from random import shuffle
@@ -22,10 +23,11 @@ import csv
 #
 # (in e.g. ipython shell)
 
+# alltypes=["eworker","queen","lateworker","malepupa","queenpupa","workerpupa"] # all ant types in data
 # antdict=ants.load_relatedness_data(filename="MYLA_allSamples_Genotypes.txt",colonyfilter='MY')  # reads data for the MY supercolony
-# net_workers_MY=ants.antnet(antdict,anttypes=["eworker"],reftypes=["eworker","queen"]) # generates a network for early workers in MY, using early workers and queens for background relateness
+# net_workers_MY=ants.antnet(antdict,anttypes=["eworker"],reftypes=alltypes) # generates a network for early workers in MY, using early workers and queens for background relateness
 # coords = ants.readcoords()
-# rshuffle_workers_MY=ants.shuffled_rvalues_conserve(antdict,100,anttypes=["eworker"],reftypes=["eworker","queen"]) # generates 100 reference nets between early workers with ants randomly shuffled between nests
+# rshuffle_workers_MY=ants.shuffled_rvalues_conserve(antdict,100,anttypes=["eworker"],reftypes=alltypes) # generates 100 reference nets between early workers with ants randomly shuffled between nests
 # ants.plot_map_network_pvalue(net_workers_MY,coords,rshuffle_workers_MY,show='MY')
 
 # ======= PYNET NETWORK FORMAT =======================================
@@ -40,18 +42,18 @@ import csv
 
 # --- geocoordinate limits for supercolonies in MYLA_allSamples_Genotypes.txt
 
-xlim_all=[283000,293000]
-ylim_all=[6650750,6656670]
+xlim_all=[285800,290000]
+ylim_all=[6651400,6656200]
 
-xlim_LA=[286000,286700]
-fvylim_LA=[6651760,6652170]
+xlim_LA=[286100,286600]
+ylim_LA=[6651790,6652160]
 
-xlim_MY=[289000,290000]
-ylim_MY=[6655380,6655970]
+xlim_MY=[289200,289700]
+ylim_MY=[6655480,6655870]
 
 # --- REPLACE WITH YOUR WORKING PATH
 
-mypath='/users/jsaramak/Documents/working_old/murkut/'
+mypath='/users/jsaramak/Documents/working/murkut/'
 
 # ======= READING DATA AND CONSTRUCTING NETWORKS ==============================================
 
@@ -123,13 +125,6 @@ def load_relatedness_data(filename="MYLA_allSamples_Genotypes.txt",anttypes=["ew
                 tempdict['alleles']=allele_list
 
                 antdict[ant]=tempdict
-
-            else:
-
-                print line[1]
-                print line[2]
-                print line[3]
-                print 'wot'
                 
         except:
 
@@ -236,10 +231,22 @@ def relatedness_values(net,addone=True):
 # ==================== PLOTTING AND VISUALIZATION ===================================================
 #
 
-def plot_map_network_pvalue(orignet,coords,rvalues,imgfile='K344.tif',pvalue=0.05,notitle=True,bonferroni=False,filename='temp',nodedict={},addone_links=True,addone_nodes=False,addone_refs=True,ext_scale=False,minvalue=0.0,maxvalue=0.0,labelson=True,nodesize=10,nodecolor='w',smallinks=False,singlecolor=False,mycolor='k',show='all',alpha=1.0):
+def plot_map_network_pvalue(orignet,coords,rvalues,imgfile='K344.tif',pvalue=0.05,nodesize=10.0,notitle=True,bonferroni=False,filename='temp',nodedict={},addone_links=True,addone_nodes=False,addone_refs=True,ext_scale=False,minvalue=0.0,maxvalue=0.0,labelson=True,smallnodes=False,smallinks=False,singlecolor=False,mycolor='k',show='all',alpha=1.0):
 
     '''Visualizes the relatedness network orignet using coordinates in dict coords, thresholding the network such that only links that have
-       relatednesses with likelihoods below pvalue in shuffled reference data input in rvalues are shown'''
+       relatednesses with likelihoods below pvalue in shuffled reference data input in rvalues are shown.
+       Input parameters:
+       orignet - the network to be visualized
+       coords - a dictionary of coordinates for nests
+       rvalues - a list of reference relatedness values from shuffling, computed with ants.shuffled_rvalues_conserve
+       imgfile - the background map image as .tif
+       pvalue - sets the threshold, using rvalues s.t. probability of r>r_{threshold} is equal/smaller than p in rvalues. Only links with
+                r over the threshold value are shown.
+       notitle - show/don't show plot title (default False)
+       bonferonni - apply Bonferonni correction to pvalue, default False
+       filename - name of file to save to
+       nodedict - dict where keys = nodes, values = e.g. within-nest relatednesses. Used in coloring nodes.
+       addone_links,addone_nodes,addone_refs = True. Use True when and if the 1.0 bias has been added to relatedness values.'''
 
     if not(ext_scale):
 
@@ -286,9 +293,9 @@ def plot_map_network_pvalue(orignet,coords,rvalues,imgfile='K344.tif',pvalue=0.0
 
     # lin3
 
-    #img=imread(mypath+'K344.tif')
+    img=imread(mypath+'K344.tif')
 
-#    pylab.imshow(img,zorder=0,extent=[260002,260002+4*12000,6665988-4*6000,6665988],alpha=alpha)
+    pylab.imshow(img,zorder=0,extent=[260002,260002+4*12000,6665988-4*6000,6665988],alpha=alpha)
 
     pylab.hold(True)
 
@@ -311,7 +318,12 @@ def plot_map_network_pvalue(orignet,coords,rvalues,imgfile='K344.tif',pvalue=0.0
 
     # overlay nodes first
 
-    if not(nodedict):
+    if not(smallnodes):
+
+        nodeSizes=get_nodesizes(nodedict,minsize=6.0,maxsize=10.0)
+        nodeColors=get_nodecolors(nodedict,colormap='jet',minr=minr,maxr=maxr)
+
+    else:
 
         nodeSizes={}
         nodeColors={}
@@ -319,13 +331,8 @@ def plot_map_network_pvalue(orignet,coords,rvalues,imgfile='K344.tif',pvalue=0.0
         for node in net:
 
             nodeSizes[node]=nodesize
-            nodeColors[node]=nodecolor
+            nodeColors[node]='w'
 
-    else:
-
-        nodeSizes=get_nodesizes(nodedict,minsize=6.0,maxsize=10.0)
-        nodeColors=get_nodecolors(nodedict,colormap='jet',minr=minr,maxr=maxr)
-    
     for node in net:        
 
         pylab.plot(coords[node][0],coords[node][1],'ko',color=nodeColors[node],markersize=nodeSizes[node],zorder=1000)
@@ -336,15 +343,42 @@ def plot_map_network_pvalue(orignet,coords,rvalues,imgfile='K344.tif',pvalue=0.0
     links_unsorted=list(net.edges)
     links=sorted(links_unsorted,key=lambda x:x[2])
 
+    minlink=1.0
+    maxlink=4.0
+
+    if smallinks:
+
+        minlink=0.2
+        maxlink=1.0
+
     for index,link in enumerate(links):
 
-        width=scaled(link[2],(minr,maxr),(1.0,4.0))
+        width=scaled(link[2],(minr,maxr),(minlink,maxlink))
         color=get_color(link[2],(minr,maxr))
 
         i=link[0]
         j=link[1]
 
-        pylab.plot([coords[i][0],coords[j][0]],[coords[i][1],coords[j][1]],'k-',color=color,linewidth=width,zorder=index)
+        pylab.plot([coords[i][0],coords[j][0]],[coords[i][1],coords[j][1]],'k-',color=color,linewidth=width,zorder=index+1)
+
+    pylab.tick_params(
+    axis='both',          # changes apply to the x-axis
+    which='both',      # both major and minor ticks are affected
+    bottom='on',
+    top='on',   
+    labelbottom='off',
+    labeltop='off',
+    labelright='off',
+    labelleft='off') # labels along the bottom edge are off
+
+    savestring='threshold_p%1.2f'%(pvalue)
+
+    pylab.show()
+
+    pylab.hold(False)
+
+    pylab.savefig(mypath+savestring+filename+'.pdf')
+
 
 def links(net,addone=True):
 
@@ -387,7 +421,8 @@ def joint_edges(net1,net2,addone=True):
 
 def shuffled_rvalues_conserve(antdict,N,anttypes,reftypes):
 
-    '''Shuffles anttypes between nests, computes new network, lists relatedness values, repeates N times'''
+    '''Shuffles ants between nests, computes new network, lists relatedness values, repeats N times.
+       Keeps the number of ants of each type at each nest constant.'''
 
     rvalues=[]
 
@@ -403,7 +438,49 @@ def shuffled_rvalues_conserve(antdict,N,anttypes,reftypes):
 
     return rvalues
 
+def shuffled_rvalues(antdict,N,anttypes,reftypes):
+
+    '''Shuffles ants between nests, computes new network, lists relatedness values, repeats N times.
+       Does not keep the number of ants of each type at each nest constant.'''
+
+    rvalues=[]
+
+    for i in xrange(0,N):
+
+        dummy=shuffled_antdict(antdict)
+
+        tempnet=antnet(dummy,anttypes=anttypes,reftypes=reftypes,colonyavg=False)
+
+        rvalues=[edge[2] for edge in list(tempnet.edges)]
+
+        print 'Network '+str(i)+' completed\n'
+
+    return rvalues
+
+def shuffled_antdict(antdict):
+
+    '''Returns an antdict where the sites of all ants have been randomly shuffled'''
+
+    new_antdict={}
+
+    sites=sorted([antdict[ant]['site'] for ant in antdict],key=lambda *args:np.random.rand())
+
+    for ant,site in zip(antdict.keys(),sites):
+
+        new_antdict[ant]['site']=site
+        new_antdict['alleles']=antdict[ant]['alleles']
+        new_antdict['loci']=antdict[ant]['loci']
+        new_antdict['type']=antdict[ant]['type']
+        new_antdict['colony']=antdict[ant]['colony']
+
+    return new_antdict
+        
+
 def shuffled_antdict_conserve(antdict):
+
+    # shuffles the sites (locations) of all ants
+    # while keeping the total number of ants of each type
+    # constant at each site.
 
     typelist=[]
 
@@ -419,7 +496,7 @@ def shuffled_antdict_conserve(antdict):
 
     for anttype in typelist:
 
-        listdict[anttype]=[[],[]]
+        listdict[anttype]=[[],[]] # construct a separate list of lists [ants],[sites] for each anttype
 
     for ant in antdict:
 
@@ -430,7 +507,7 @@ def shuffled_antdict_conserve(antdict):
 
         sitelist_temp=listdict[anttype][1]
         
-        sitelist_new=sorted(sitelist_temp,key=lambda *args:np.random.rand())
+        sitelist_new=sorted(sitelist_temp,key=lambda *args:np.random.rand()) # shuffle the site id list
 
         listdict[anttype][1]=sitelist_new
 
@@ -438,7 +515,7 @@ def shuffled_antdict_conserve(antdict):
 
     for anttype in typelist:
 
-        for i in range(0,len(listdict[anttype][0])):
+        for i in xrange(0,len(listdict[anttype][0])):
 
             ant=listdict[anttype][0][i]
             site=listdict[anttype][1][i]
@@ -1209,6 +1286,8 @@ def threshold_by_pvalue(net,rvalues,pvalue,bonferroni=False,orig_addone=False,re
 
         threshold_value+=1.0
 
+    print threshold_value,rough_point
+
     newnet=threshold_by_value(net,threshold_value,accept='>',keepIsolatedNodes=True)
 
     return newnet,threshold_value
@@ -1425,7 +1504,7 @@ def setColorMap(colorMap):
         myMap = matplotlib.colors.LinearSegmentedColormap(colorMap, segmentdata)
     else:
         try:
-            myMap=get_cmap(colorMap)
+            myMap=pylab.get_cmap(colorMap)
         except AssertionError:
             comment = "Could not recognize given colorMap name '%s'" % colorMap
             raise AssertionError(comment)
@@ -1469,7 +1548,6 @@ def threshold_by_value(net,threshold,accept="<",keepIsolatedNodes=False):
                 for node in toNet:
                     value=fromNet.nodeProperty[p][node]
                     toNet.nodeProperty[p][node]=value
-
 
     newnet=pynet.SymmNet()
     edges=list(net.edges)
@@ -1519,6 +1597,31 @@ def subdict(antdict,prefix='MY',from_nest=1,to_nest=10):
             newdict[ant]=antdict[ant]
 
     return newdict
+
+def get_min_max_r(nets,addone=True):
+
+    '''returns the minimum, maximum, and mean relatedness values for a network or list of networks'''
+
+    for net in nets:
+
+        w=[x[2] for x in net.edges]
+
+    if addone:
+
+        return np.min(w)-1.0,np.max(w)-1.0,np.mean(w)-1.0
+
+    else:
+
+        return np.min(w),np.max(w),np.mean(w)
+
+def between_nest_correlations(antdict,type1,type2,reftypes):
+
+    net1=antnet(antdict,anttypes=type1,reftypes=reftypes)
+    net2=antnet(antdict,anttypes=type2,reftypes=reftypes)
+
+    r1,r2=joint_edges(net1,net2)
+
+    print pearsonr(r1,r2)
 
         
 
