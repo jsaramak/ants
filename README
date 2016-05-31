@@ -9,6 +9,15 @@
 #
 # ============================================================================
 
+# Python modules:
+# 	 ants.py - this is the main module for analysis 
+#
+#	 pynet.py - contains the network class used (pynet.SymmNet)
+#	 netext.py - network-related functions
+#	 transforms.py - functions that transform networks	 
+#	 		
+# In practice you should not need to touch anything besides ants.py	
+
 # ====== USAGE EXAMPLE ==============================================
 #
 # (in e.g. ipython shell, or in a Jupyter Notebook)
