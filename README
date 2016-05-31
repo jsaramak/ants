@@ -1,0 +1,29 @@
+# =============================================================================
+#
+#    code used for data analysis in
+#    Schultner, Saramaki, Helantera:
+#    Network analysis reveals complex genetic substructure in ant supercolonies
+#
+#    author: Jari Saramaki, jari.saramaki@aalto.fi
+#    v1.0
+#
+# ============================================================================
+
+# ====== USAGE EXAMPLE ==============================================
+#
+# (in e.g. ipython shell, or in a Jupyter Notebook)
+
+# import ants
+# alltypes=["eworker","queen","lateworker","malepupa","queenpupa","workerpupa"] # all ant types in data
+# antdict=ants.load_relatedness_data(filename="MYLA_allSamples_Genotypes.txt",colonyfilter='MY')  # reads data for the MY supercolony
+# net_workers_MY=ants.antnet(antdict,anttypes=["eworker"],reftypes=alltypes) # generates a network for early workers in MY, using early workers and queens for background relateness
+# coords = ants.readcoords()
+# rshuffle_workers_MY=ants.shuffled_rvalues_conserve(antdict,100,anttypes=["eworker"],reftypes=alltypes) # generates 100 reference nets between early workers with ants randomly shuffled between nests
+# ants.plot_map_network_pvalue(net_workers_MY,coords,rshuffle_workers_MY,show='MY')
+
+# ======= PYNET NETWORK FORMAT =======================================
+#
+# The object net (a pynet.Symmnet object) returns the relatedness between
+# sites i and j as follows: net[i][j]
+# Note that we add 1.0 to relatedness values because a relatedness of 0.0
+# would be interpreted as missing link. So subtract 1.0 whenever necessary.
