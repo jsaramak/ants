@@ -246,7 +246,10 @@ def plot_map_network_pvalue(orignet,coords,rvalues,imgfile='K344.tif',pvalue=0.0
        bonferonni - apply Bonferonni correction to pvalue, default False
        filename - name of file to save to
        nodedict - dict where keys = nodes, values = e.g. within-nest relatednesses. Used in coloring nodes.
-       addone_links,addone_nodes,addone_refs = True. Use True when and if the 1.0 bias has been added to relatedness values.'''
+       addone_links,addone_nodes,addone_refs = True. Use True when and if the 1.0 bias has been added to relatedness values.
+       ext_scale - (True/False) use/don't use an externally defined color scale for links. (False: use min and max r of your network)
+       min_value, max_value - min and max r for the above ext_scale
+       show = ('MY'|'LA'|'all') - displays area covering MY or LA or both.'''
 
     if not(ext_scale):
 
@@ -426,17 +429,22 @@ def shuffled_rvalues_conserve(antdict,N,anttypes,reftypes):
 
     rvalues=[]
 
+    t00=time.time()
+
     for i in range(0,N):
+
+        t0=time.time()
+
 
         dummy=shuffled_antdict_conserve(antdict)
 
         tempnet=antnet(dummy,anttypes=anttypes,reftypes=reftypes,colonyavg=False)
 
-        rvalues=[edge[2] for edge in list(tempnet.edges)]
+        rvalues.extend([edge[2] for edge in list(tempnet.edges)])
 
-        print 'Network '+str(i)+' completed\n'
+        delta_t=time.time()-t0
 
-    return rvalues
+        print 'Network '+str(i)+' completed in time '+"{0:0.1f}".format(delta_t)+" s, estimated runtime "+"{0:0.1f}".format(((N-float(i))*delta_t)/60.0)+" min
 
 def shuffled_rvalues(antdict,N,anttypes,reftypes):
 
@@ -445,15 +453,25 @@ def shuffled_rvalues(antdict,N,anttypes,reftypes):
 
     rvalues=[]
 
+    t00=time.time()
+
     for i in xrange(0,N):
+
+        t0=time.time()
 
         dummy=shuffled_antdict(antdict)
 
         tempnet=antnet(dummy,anttypes=anttypes,reftypes=reftypes,colonyavg=False)
 
-        rvalues=[edge[2] for edge in list(tempnet.edges)]
+        rvalues.extend([edge[2] for edge in list(tempnet.edges)])
 
-        print 'Network '+str(i)+' completed\n'
+        delta_t=time.time()-t0
+
+        print 'Network '+str(i)+' completed in time '+"{0:0.1f}".format(delta_t)+" s, estimated runtime "+"{0:0.1f}".format(((N-float(i))*delta_t)/60.0)+" min"
+
+    print "Done "+str(N)+" shuffles, runtime "+"{0:0.1f}".format((time.time()-t00)/60.0)+" minutes."
+
+    file_io.picklesave(mypath+'tempdata.pic',rvalues)
 
     return rvalues
 
@@ -1622,6 +1640,193 @@ def between_nest_correlations(antdict,type1,type2,reftypes):
     r1,r2=joint_edges(net1,net2)
 
     print pearsonr(r1,r2)
+    
+
+def autothreshold(net):
+
+    '''Yields the relatedness threshold for which the network splits into two components s.t. both are larger than
+       one node'''
+
+    edges=sorted(list(net.edges),key=lambda x:x[2])
+
+    newnet=pynet.SymmNet()
+
+    for edge in edges:
+
+        newnet[edge[0]][edge[1]]=edge[2]
+
+    stopnow=False
+
+    i=0
+
+    while not(stopnow):
+
+        newnet[edges[i][0]][edges[i][1]]=0
+
+        c=percolator.getComponents(newnet)
+
+        if len(c)>1:
+
+            sizes=[]
+
+            for cx in c:
+
+                sizes.append(len(cx))
+
+            large_sizes=[s for s in sizes if s>1]
+
+            if len(large_sizes)>1:
+
+                stopnow=True
+                
+        i+=1
+
+    return edges[i-1][2]
+
+def cluster_MST(antnet,clusterA,clusterB):
+
+    '''inputs ant net and its nests divided in clusters A and B (lists of nodes).
+       Computes max spanning tree; computes how many of its links are in A-A,A-B,B-B.'''
+
+    mst=transforms.mst_kruskal(antnet,maximum=True)
+
+    internalA=0
+    internalB=0
+    between=0
+
+    for link in list(mst.edges):
+
+        if (link[0] in clusterA) and (link[1] in clusterA):
+
+            internalA+=1
+
+        elif (link[0] in clusterB) and (link[1] in clusterB):
+
+            internalB+=1
+
+        else:
+
+            between+=1
+
+    print "Internal links in A: ",internalA
+    print "Internal links in B: ",internalB
+    print "Between A and B: ",between
+
+def split_rvalues(antnet,subtract_one=True):
+
+    '''Input the full MY+LA antnet -> this function gives three lists of link weights, from the full MY and LA net:
+       relatedness values in MY, LA and between: r_MY,r_LA, and r_between'''
+
+    r_MY=[]
+    r_LA=[]
+    r_between=[]
+
+    for edge in list(antnet.edges):
+
+        if edge[0][0]=='M' and edge[1][0]=='M':
+
+            r_MY.append(edge[2]-1.0)
+
+        elif edge[0][0]=='L' and edge[1][0]=='L':
+
+            r_LA.append(edge[2]-1.0)
+
+        else:
+
+            r_between.append(edge[2]-1.0)
+
+    return r_MY,r_LA,r_between
+
+def write_BAPS(antdict,filename,headerstring='',append=False,anttypes=['eworker','queen','lateworker','queenpupa','workerpupa']):
+
+    '''Writes data that is originally in the antdict format used by these scripts as a file
+       that is readable by BAPS. Set append=True to append to the end of an existing file'''
+
+    separator=' ' # BAPS uses WS as separator
+
+    if append:
+
+        f=open(filename,"a")
+
+    else:
+
+        f=open(filename,"w")
+
+        # first write header string
+        
+        f.write(headerstring+'\n')
+
+        # then the names of all used loci
+
+        loci=antdict[antdict.keys()[0]]['loci']
+
+        for locus in loci:
+
+            f.write(locus+'\n')
+
+    # then each population in antdict
+
+    # begin by listing all populations (sites) in antdict
+
+    sites=[]
+
+    for ant in antdict:
+
+        if not(antdict[ant]['site'] in sites):
+
+            sites.append(antdict[ant]['site'])
+
+    # then go through each site
+
+    for site in sites:
+
+        f.write('Pop\n') 
+
+
+        for ant in antdict:
+
+            if antdict[ant]['site']==site and (antdict[ant]['type'] in anttypes):
+
+                # write out each ant in BAPS format
+
+                # first write out site
+
+                f.write(site+','+separator)
+
+                # then alleles
+
+                for allele in antdict[ant]['alleles']:
+
+                    if allele[0]==-999:
+
+                        first='000'
+
+                    else:
+
+                        first=str(allele[0])
+
+                    if allele[1]==-999:
+
+                        second='000'
+
+                    else:
+
+                        second=str(allele[1])
+
+                    if len(first)<3:
+
+                        first='0'+first
+
+                    if len(second)<3:
+
+                        second='0'+second
+
+                    f.write(first+second+separator)
+
+                f.write('\n')
+
+        
+    f.close()
 
         
 
