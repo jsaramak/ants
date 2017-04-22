@@ -1,9 +1,11 @@
 # =============================================================================
 #
-#    code used for data analysis in
-#    Schultner, Saramaki, Helantera:
-#    Network analysis reveals complex genetic substructure in ant supercolonies
+#    Code & data for
+#    Genetic structure of native ant supercolonies varies in space and time, 
+#    Molecularar Ecology. 25, 6196-6213 (2016)
 #
+#    Please cite this paper if you publish something with our code or data. 
+#    
 #    author: Jari Saramaki, jari.saramaki@aalto.fi
 #    v1.0
 #
